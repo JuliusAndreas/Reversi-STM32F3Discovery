@@ -7,23 +7,31 @@
 
 #include "OthelloLib.h"
 
+const unsigned char black_win_message[23] = "Game Over. Black wins.\n";
+const unsigned char white_win_message[23] = "Game Over. White wins.\n";
+const unsigned char tie_message[16] = "Game is a draw.\n";
+
 void enable_7_seg(int num){
 	switch (num){
 		case 1:
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3, 0);
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 1);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, 1);
 			break;
 		case 2:
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3, 0);
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 1);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, 0);
 			break;
 		case 3:
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3, 0);
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, 1);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, 1);
 			break;
 		case 4:
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3, 0);
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, 1);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, 1);
 			break;
 	}
 }
@@ -91,6 +99,25 @@ void init_map(int board[8][8]){
 	print("D4");
 	setCursor(1, 0);
 	print("B");
+	//drawing borders
+	setCursor(6, 0);
+	print("|");
+	setCursor(6, 1);
+	print("|");
+	setCursor(6, 2);
+	print("|");
+	setCursor(6, 3);
+	print("|");
+	setCursor(15, 0);
+	print("|");
+	setCursor(15, 1);
+	print("|");
+	setCursor(15, 2);
+	print("|");
+	setCursor(15, 3);
+	print("|");
+
+
 }
 
 int isValid(int row, int col, int turn){
@@ -542,7 +569,11 @@ void capture(int row, int col, int turn){
 		}
 
 	}
-
+	frequency = 30;
+	HAL_TIM_Base_Stop_IT(&htim3);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 0);
+	TIM_HandleTypeDef *timer = &htim3;
+	timer->Instance->PSC = 7199;
 }
 
 int canCapture(int turn){
@@ -611,29 +642,72 @@ void show_scores(){
 	setCursor(1, 1);
 	sprintf(b_score, "%d",black_score);
 	print(b_score);
+	setCursor(1, 2);
+	print("b");
 	setCursor(18, 1);
 	sprintf(w_score, "%d",white_score);
 	print(w_score);
+	setCursor(18, 2);
+	print("w");
 }
 
-void switch_turns(){
+int switch_turns(){
 	if(turn==2){
 		if(canCapture(1)){
 			turn =1;
 			setCursor(1, 0);
 			print("W");
+			remaining_time = time_limit;
+			return 0;
+		}else{
+			if(canCapture(2)){
+				remaining_time = time_limit;
+				return 0;
+			}else{
+				//returning 1 means game over
+				return 1;
+			}
 		}
 	}else{
 		if(canCapture(2)){
 			turn =2;
 			setCursor(1, 0);
 			print("B");
+			remaining_time = time_limit;
+			return 0;
+		}else{
+			if(canCapture(1)){
+				remaining_time = time_limit;
+				return 0;
+			}else{
+				//returning 1 means game over
+				return 1;
+			}
 		}
 	}
 }
 
 int col_letter_to_num(char letter){
-
+	switch(letter){
+			case 'A':
+				return 0;
+			case 'B':
+				return 1;
+			case 'C':
+				return 2;
+			case 'D':
+				return 3;
+			case 'E':
+				return 4;
+			case 'F':
+				return 5;
+			case 'G':
+				return 6;
+			case 'H':
+				return 7;
+			default:
+				return -1;
+		}
 }
 
 int row_char_to_num(char row_num_char){
@@ -654,5 +728,117 @@ int row_char_to_num(char row_num_char){
 			return 6;
 		case '8':
 			return 7;
+		default:
+			return -1;
 	}
+}
+
+void game_over(){
+	clear();
+	int black_score = 0;
+	int white_score = 0;
+	char b_score[5];
+	char w_score[5];
+	for(int i=0;i<8;i++){
+		for(int j=0;j<8;j++){
+			if(board[i][j]==2){
+				black_score++;
+			}else if(board[i][j]==1){
+				white_score++;
+			}
+		}
+	}
+	setCursor(1, 1);
+	sprintf(b_score, "%d",black_score);
+	print(b_score);
+	setCursor(18, 1);
+	sprintf(w_score, "%d",white_score);
+	print(w_score);
+	setCursor(7, 0);
+	if(black_score>white_score){
+
+		print("Black");
+		setCursor(7, 1);
+		print("Wins");
+		HAL_UART_Transmit(&huart3, black_win_message, sizeof(black_win_message), 1000);
+
+	}else if(black_score<white_score){
+
+		print("White");
+		setCursor(7, 1);
+		print("Wins");
+		HAL_UART_Transmit(&huart3, white_win_message, sizeof(white_win_message), 1000);
+
+	}else{
+
+		print("Tie");
+		HAL_UART_Transmit(&huart3, tie_message, sizeof(tie_message), 1000);
+
+	}
+	frequency = 30;
+	HAL_TIM_Base_Stop_IT(&htim3);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 0);
+	TIM_HandleTypeDef *timer = &htim3;
+	timer->Instance->PSC = 7199;
+}
+
+int board_is_full(){
+	for(int i=0;i<8;i++){
+		for(int j=0;j<8;j++){
+			if(board[i][j]==0){
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+void forced_game_over(int turn){
+	clear();
+	int black_score = 0;
+	int white_score = 0;
+	char b_score[5];
+	char w_score[5];
+	for(int i=0;i<8;i++){
+		for(int j=0;j<8;j++){
+			if(board[i][j]==2){
+				black_score++;
+			}else if(board[i][j]==1){
+				white_score++;
+			}
+		}
+	}
+	setCursor(1, 1);
+	sprintf(b_score, "%d",black_score);
+	print(b_score);
+	setCursor(1, 2);
+	print("b");
+	setCursor(18, 1);
+	sprintf(w_score, "%d",white_score);
+	print(w_score);
+	setCursor(18, 2);
+	print("w");
+	setCursor(7, 0);
+	if(turn==1){
+		setCursor(7, 0);
+		print("Black");
+		setCursor(7, 1);
+		print("Wins");
+		setCursor(7, 2);
+		print("Timeout");
+		HAL_UART_Transmit(&huart3, black_win_message, sizeof(black_win_message), 1000);
+	}else if(turn ==2){
+		setCursor(7, 0);
+		print("White");
+		setCursor(7, 1);
+		print("Wins");
+		setCursor(7, 2);
+		print("Timeout");
+		HAL_UART_Transmit(&huart3, white_win_message, sizeof(white_win_message), 1000);
+	}
+	frequency = 30;
+	HAL_TIM_Base_Stop_IT(&htim3);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 0);
+	TIM_HandleTypeDef *timer = &htim3;
+	timer->Instance->PSC = 7199;
 }

@@ -8,6 +8,7 @@
 /* include files */
 #include "main.h"
 #include "LiquidCrystal.h"
+#include "stm32f3xx_it.h"
 
 #ifndef INC_OTHELLOLIB_H_
 #define INC_OTHELLOLIB_H_
@@ -15,8 +16,19 @@
 /* externs */
 
 extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim3;
 extern int board[8][8];
 extern int turn;
+extern int remaining_time;
+extern int time_limit;
+extern UART_HandleTypeDef huart3;
+extern int frequency;
+
+/* global variables */
+
+const unsigned char black_win_message[23];
+const unsigned char white_win_message[23];
+const unsigned char tie_message[16];
 
 /* prototypes */
 
@@ -34,8 +46,11 @@ void capture(int row, int col, int turn);
 int canCapture(int turn);
 void print_board();
 void show_scores();
-void switch_turns();
+int switch_turns();
 int col_letter_to_num(char letter);
 int row_char_to_num(char row_num_char);
+void game_over();
+int board_is_full();
+void forced_game_over(int turn);
 
 #endif /* INC_OTHELLOLIB_H_ */
